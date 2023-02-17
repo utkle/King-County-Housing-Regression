@@ -18,4 +18,4 @@ After evaluting the properties and classifying them based on maintenance conditi
 
 Conclusion
 
-kc-was-study.pptx contains an overview presentation of our findings. Our analysis provides valuable insights into the King County housing market and can help the contractor make informed decisions about where to invest.
+housing.pdf contains an overview presentation of our findings. Our analysis provides valuable insights into the King County housing market and can help the contractor make informed decisions about where to invest.
