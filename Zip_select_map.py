@@ -71,19 +71,63 @@ def get_class(row):
     else:
         return 1
 
-df_king['class'] = df_king.apply(get_class, axis=1)
+df_dict = {}
 
-# Find difference between class 2 and class 0 median property values per zip, neglecting zip codes with null values
-df_median_price = pd.pivot_table(df_king, values='price', index='zipcode', columns='class', aggfunc='median')
-df_median_price = df_median_price.dropna()
-df_median_price = df_median_price.reset_index()
-df_median_price['diff'] = df_median_price[2] - df_median_price[0]
-df_median_price = df_median_price.rename(columns={'zipcode': 'ZIPCODE'})
+# Iterate over the zip codes
+for zip_code in df_king['zipcode'].unique():
+    # Create a subset DataFrame for the current zip code
+    zip_df = df_king[df_king['zipcode'] == zip_code]
+    
+    # Perform outlier removal based on price to the subset
+    for x in ['price']:
+        q75, q25 = np.percentile(zip_df.loc[:, x], [75, 25])
+        intr_qr = q75 - q25
+        max_val = q75 + (1.5 * intr_qr)
+        min_val = q25 - (1.5 * intr_qr)
+        zip_df.loc[zip_df.loc[:, x] > max_val, x] = np.nan
+        zip_df.loc[zip_df.loc[:, x] < min_val, x] = np.nan
+        zip_df = zip_df.dropna(subset=[x])
+    
+    # Classify each property
+    zip_df['class'] = zip_df.apply(get_class, axis=1)
+
+    # Add the subset DataFrame to the dictionary with the zip code as the key
+    df_dict[zip_code] = zip_df
+
+# # Find difference between class 2 and class 0 median property values per zip, neglecting zip codes with null values
+# zip_median_class = pd.pivot_table(df_king, values='price', index='zipcode', columns='class', aggfunc='median')
+# zip_median_class = zip_median_class.dropna()
+# zip_median_class = zip_median_class.reset_index()
+# zip_median_class['diff'] = zip_median_class[2] - zip_median_class[0]
+# zip_median_class = zip_median_class.rename(columns={'zipcode': 'ZIPCODE'})
+
+zip_median_class = pd.DataFrame(columns=['zipcode', 'class', 'median_price'])
+
+# Iterate over the keys (zip codes) in the dictionary
+for key in df_dict.keys():
+    # Select the subset DataFrame for the current key
+    subset_df = df_dict[key]
+    # Compute the medians for each class using groupby() and median()
+    class_medians = subset_df.groupby('class')['price'].median()
+    # Create a new DataFrame with the zip code, class, and median price for each class
+    zip_df = pd.DataFrame({'zipcode': [key]*len(class_medians), 'class': class_medians.index, 'median_price': class_medians.values})
+    # Append the new DataFrame to the result DataFrame
+    zip_median_class = zip_median_class.append(zip_df)
+
+# Reset the index of the result DataFrame
+zip_median_class.reset_index(drop=True, inplace=True)
+
+# Reshape the result DataFrame using pivot()
+zip_median_class = zip_median_class.pivot(index='zipcode', columns='class', values='median_price')
+zip_median_class.reset_index(inplace=True)
+
+zip_median_class['diff'] = zip_median_class[2] - zip_median_class[0]
+zip_median_class = zip_median_class.rename(columns={'zipcode': 'ZIPCODE'})
 
 # Map difference per zip, zipcode border data from Kings County
 geojson_file = 'data/Zipcodes_for_King_County_and_Surrounding_Area_(Shorelines)___zipcode_shore_area.geojson'
-zipcodes = df_median_price['ZIPCODE'].tolist()
-diffs = df_median_price['diff'].tolist()
+zipcodes = zip_median_class['ZIPCODE'].tolist()
+diffs = zip_median_class['diff'].tolist()
 
 # Load the geojson data
 with open(geojson_file) as f:
@@ -112,7 +156,7 @@ folium.GeoJson(geojson_data, name = 'ZIPs', style_function=style_function).add_t
 folium.Choropleth(
     geo_data=geojson_data,
     name='diff',
-    data=df_median_price,
+    data=zip_median_class,
     columns=('ZIPCODE', 'diff'),
     key_on='feature.properties.ZIP',
     fill_color='YlOrRd',
