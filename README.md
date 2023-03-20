@@ -1,6 +1,5 @@
-# kc-was-study
+# Analysis of King County Housing Data
 
-Analysis of King County Housing Data
 
 This repository contains the code and data used for analyzing King County housing data from 2021 to 2022. The goal of this analysis is to make recommendations for a King County based contractor to identify where to flip houses.
 
